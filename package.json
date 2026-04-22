@@ -19,6 +19,7 @@
     "clean": "node ./scripts/clean.mjs",
     "dev": "npm run dev -w @prototype/api",
     "pretest": "npm run build",
+    "repl": "node ./scripts/replit-dev.mjs",
     "start:api": "npm run start -w @prototype/api",
     "start:cli": "npm run start -w @prototype/cli --",
     "start:web": "npm run dev -w @prototype/web",
@@ -34,5 +35,8 @@
   "bugs": {
     "url": "https://github.com/gavinzdarko/firecrawl-search-prototype/issues"
   },
-  "homepage": "https://github.com/gavinzdarko/firecrawl-search-prototype#readme"
+  "homepage": "https://github.com/gavinzdarko/firecrawl-search-prototype#readme",
+  "devDependencies": {
+    "tsx": "^4.20.5"
+  }
 }

@@ -51,6 +51,16 @@ npm run start:web
 The API starts on `http://localhost:3000`.
 The web UI starts on `http://localhost:4173`.
 
+## Replit
+
+This repo is configured for Replit.
+
+1. Import the GitHub repo into Replit.
+2. Click `Run`.
+3. Open the web app on port `4173`.
+
+Replit runs both the API and the browser UI together through `npm run repl`.
+
 In a separate terminal, compare raw and improved output:
 
 ```bash

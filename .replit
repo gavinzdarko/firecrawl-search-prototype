@@ -1,0 +1,12 @@
+run = "npm install && npm run repl"
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["sh", "-lc", "npm install && npm run repl"]
+
+[[ports]]
+localPort = 4173
+externalPort = 80
+
