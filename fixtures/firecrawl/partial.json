@@ -1,0 +1,22 @@
+{
+  "success": true,
+  "creditsUsed": 4,
+  "warning": "Some results could not be enriched",
+  "data": {
+    "web": [
+      {
+        "title": "Firecrawl - Web Data Infrastructure for AI",
+        "description": "Search, scrape, and interact with the web for AI systems.",
+        "url": "https://www.firecrawl.dev/",
+        "position": 1,
+        "markdown": "# Firecrawl\n\nStructured web data for AI."
+      },
+      {
+        "title": "Broken Result",
+        "description": "This item simulates a partial scrape failure.",
+        "url": "https://example.com/failure",
+        "position": 2
+      }
+    ]
+  }
+}

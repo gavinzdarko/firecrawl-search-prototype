@@ -1,0 +1,30 @@
+{
+  "success": true,
+  "creditsUsed": 5,
+  "data": {
+    "web": [
+      {
+        "title": "Firecrawl - Web Data Infrastructure for AI",
+        "description": "Search, scrape, and interact with the web for AI systems.",
+        "url": "https://www.firecrawl.dev/",
+        "position": 1,
+        "markdown": "# Firecrawl\n\nFirecrawl helps AI systems search, scrape, and interact with the web."
+      },
+      {
+        "title": "Search | Firecrawl",
+        "description": "Search the web and get clean, structured content from results.",
+        "url": "https://docs.firecrawl.dev/features/search",
+        "position": 2,
+        "markdown": "# Search\n\nSearch the web and get clean, structured content from every result in a single API call."
+      },
+      {
+        "title": "About Firecrawl",
+        "description": "Founded in 2022 as part of Y Combinator and based in San Francisco.",
+        "url": "https://www.firecrawl.dev/about",
+        "position": 3,
+        "markdown": "## Founded by builders\n\nFirecrawl was started in 2022 as part of Y Combinator."
+      }
+    ]
+  }
+}
+

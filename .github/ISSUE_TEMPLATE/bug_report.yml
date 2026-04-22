@@ -1,0 +1,34 @@
+name: Bug report
+description: Report a problem with the prototype contract, adapter, or developer experience.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the problem and the expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: Include commands, request payloads, or fixture names.
+      placeholder: |
+        1. Run `npm install`
+        2. Run `npm run start:cli -- --mode improved "firecrawl funding"`
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Node version, npm version, and whether you used fixtures or live Firecrawl.
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Anything else that may help narrow this down.

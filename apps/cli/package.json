@@ -1,0 +1,23 @@
+{
+  "name": "@prototype/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "prototype-search": "dist/apps/cli/src/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/apps/cli/src/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@prototype/core": "file:../../packages/core",
+    "@prototype/firecrawl-adapter": "file:../../packages/firecrawl-adapter"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.2"
+  }
+}
+

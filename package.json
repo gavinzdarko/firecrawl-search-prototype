@@ -1,0 +1,38 @@
+{
+  "name": "firecrawl-search-prototype",
+  "description": "Prototype wrapper that adds a clearer search contract on top of the Firecrawl Search API.",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "packageManager": "npm@10.9.4",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "check": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "clean": "node ./scripts/clean.mjs",
+    "dev": "npm run dev -w @prototype/api",
+    "pretest": "npm run build",
+    "start:api": "npm run start -w @prototype/api",
+    "start:cli": "npm run start -w @prototype/cli --",
+    "start:web": "npm run dev -w @prototype/web",
+    "test": "npm run test:workspaces --if-present && node --test ./test/**/*.test.mjs",
+    "test:workspaces": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gavinzdarko/firecrawl-search-prototype.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gavinzdarko/firecrawl-search-prototype/issues"
+  },
+  "homepage": "https://github.com/gavinzdarko/firecrawl-search-prototype#readme"
+}

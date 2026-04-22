@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "baseUrl": ".",
+    "paths": {
+      "@prototype/core": ["packages/core/src/index.ts"],
+      "@prototype/firecrawl-adapter": ["packages/firecrawl-adapter/src/index.ts"]
+    },
+    "strict": true,
+    "declaration": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "types": ["node"]
+  }
+}
