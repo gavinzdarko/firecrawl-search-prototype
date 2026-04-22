@@ -15,7 +15,8 @@
         "title": "Broken Result",
         "description": "This item simulates a partial scrape failure.",
         "url": "https://example.com/failure",
-        "position": 2
+        "position": 2,
+        "error": "Scrape failed during enrichment."
       }
     ]
   }

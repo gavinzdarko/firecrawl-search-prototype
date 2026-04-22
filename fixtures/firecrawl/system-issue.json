@@ -1,0 +1,12 @@
+{
+  "success": false,
+  "warning": "Search provider unavailable",
+  "creditsUsed": 0,
+  "_fixtureMeta": {
+    "statusCode": 503
+  },
+  "data": {
+    "web": []
+  }
+}
+

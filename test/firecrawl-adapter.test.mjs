@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 
 import { prototypeGroundRequestSchema, prototypeSearchRequestSchema } from "@prototype/core";
 import { FirecrawlAdapter } from "@prototype/firecrawl-adapter";
 
+const execFileAsync = promisify(execFile);
 const fixtureRoot = new URL("../fixtures/firecrawl/", import.meta.url);
 
 function createFixtureAdapter(overrides = {}) {
@@ -52,6 +56,21 @@ test("fixture mode marks partial enrichment scenarios explicitly", async () => {
     response.errors.some((error) => error.code === "PARTIAL_ENRICHMENT_FAILURE"),
     "expected a typed partial enrichment error",
   );
+});
+
+test("ground mode enforces maxContentResults at the wrapper layer", async () => {
+  const adapter = createFixtureAdapter();
+  const request = prototypeGroundRequestSchema.parse({
+    query: "firecrawl grounding",
+    limit: 3,
+    maxContentResults: 1,
+  });
+
+  const response = await adapter.search(request, { mode: "ground" });
+
+  assert.equal(response.items[0]?.markdown?.startsWith("#"), true);
+  assert.equal(response.items[1]?.markdown, undefined);
+  assert.equal(response.stats.contentIncludedCount, 1);
 });
 
 test("live mode without an API key returns a configuration error", async () => {
@@ -105,4 +124,44 @@ test("malformed fixture payloads are surfaced as upstream response errors", asyn
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
   }
+});
+
+test("fixture mode can simulate an upstream system issue", async () => {
+  const adapter = createFixtureAdapter();
+  const request = prototypeSearchRequestSchema.parse({
+    query: "system issue firecrawl",
+  });
+
+  const response = await adapter.search(request, { mode: "search" });
+
+  assert.equal(response.statusCode, 503);
+  assert.equal(response.errors[0]?.code, "UPSTREAM_UNAVAILABLE");
+});
+
+test("CLI rejects invalid limit values instead of returning misleading output", async () => {
+  const cliEntry = fileURLToPath(new URL("../apps/cli/dist/apps/cli/src/index.js", import.meta.url));
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [cliEntry, "--limit", "not-a-number", "firecrawl"], {
+      cwd: "/tmp",
+      env: {
+        ...process.env,
+        PROTOTYPE_USE_FIXTURES: "true",
+      },
+    }),
+  );
+});
+
+test("CLI can resolve fixtures outside the repo working directory", async () => {
+  const cliEntry = fileURLToPath(new URL("../apps/cli/dist/apps/cli/src/index.js", import.meta.url));
+
+  const { stdout } = await execFileAsync(process.execPath, [cliEntry, "firecrawl"], {
+    cwd: "/tmp",
+    env: {
+      ...process.env,
+      PROTOTYPE_USE_FIXTURES: "true",
+    },
+  });
+
+  assert.match(stdout, /Search completed successfully/);
 });

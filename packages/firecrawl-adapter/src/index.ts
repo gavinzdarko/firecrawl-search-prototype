@@ -27,6 +27,9 @@ type FirecrawlPayload = {
   success?: boolean;
   warning?: string | string[];
   creditsUsed?: number;
+  _fixtureMeta?: {
+    statusCode?: number;
+  };
   data?: {
     web?: unknown[];
     news?: unknown[];
@@ -64,16 +67,18 @@ const firecrawlPayloadSchema = z
   })
   .passthrough();
 
-function buildSiteOperators(includeDomains: string[], excludeDomains: string[]): string {
-  const include = includeDomains.map((domain) => `site:${domain}`).join(" ");
-  const exclude = excludeDomains.map((domain) => `-site:${domain}`).join(" ");
-  return [include, exclude].filter(Boolean).join(" ").trim();
-}
-
 function chooseFixtureName(
   request: PrototypeSearchRequest | PrototypeGroundRequest,
   mode: PrototypeMode,
 ): string {
+  if (request.query.toLowerCase().includes("system issue")) {
+    return "system-issue.json";
+  }
+
+  if (request.query.toLowerCase().includes("timeout")) {
+    return "timeout.json";
+  }
+
   if (request.query.toLowerCase().includes("no results")) {
     return "no-results.json";
   }
@@ -222,6 +227,187 @@ function inferPartialState(
   return false;
 }
 
+function getDomain(url: string): string | null {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function parseDateMs(value?: string): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function applyDomainFilters(
+  items: UpstreamItem[],
+  includeDomains: string[],
+  excludeDomains: string[],
+): { items: UpstreamItem[]; filteredCount: number } {
+  if (includeDomains.length === 0 && excludeDomains.length === 0) {
+    return { items, filteredCount: 0 };
+  }
+
+  const includeSet = new Set(includeDomains.map((domain) => domain.toLowerCase()));
+  const excludeSet = new Set(excludeDomains.map((domain) => domain.toLowerCase()));
+
+  const filteredItems = items.filter((item) => {
+    const domain = getDomain(item.url);
+    if (!domain) {
+      return includeSet.size === 0;
+    }
+
+    if (excludeSet.has(domain)) {
+      return false;
+    }
+
+    if (includeSet.size > 0) {
+      return includeSet.has(domain);
+    }
+
+    return true;
+  });
+
+  return {
+    items: filteredItems,
+    filteredCount: items.length - filteredItems.length,
+  };
+}
+
+function applyFreshnessPolicy(
+  items: UpstreamItem[],
+  freshness: PrototypeSearchRequest["freshness"],
+): {
+  items: UpstreamItem[];
+  filteredCount: number;
+  parseableDateCount: number;
+  degradedReasons: string[];
+  warnings: string[];
+} {
+  if (freshness === "any") {
+    return {
+      items,
+      filteredCount: 0,
+      parseableDateCount: items.filter((item) => parseDateMs(item.date) !== null).length,
+      degradedReasons: [],
+      warnings: [],
+    };
+  }
+
+  const now = Date.now();
+  const maxAgeMs = freshness === "strict" ? 7 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+  let parseableDateCount = 0;
+
+  const filteredItems = items.filter((item) => {
+    const parsedDate = parseDateMs(item.date);
+    if (parsedDate === null) {
+      return freshness !== "strict";
+    }
+
+    parseableDateCount += 1;
+    return now - parsedDate <= maxAgeMs;
+  });
+
+  const degradedReasons: string[] = [];
+  const warnings: string[] = [];
+
+  if (parseableDateCount === 0) {
+    degradedReasons.push("freshness_unverifiable");
+    warnings.push("Freshness was requested, but upstream results did not include parseable dates.");
+  }
+
+  return {
+    items: filteredItems,
+    filteredCount: items.length - filteredItems.length,
+    parseableDateCount,
+    degradedReasons,
+    warnings,
+  };
+}
+
+function applyGroundContentLimit(
+  items: UpstreamItem[],
+  request: PrototypeSearchRequest | PrototypeGroundRequest,
+  mode: PrototypeMode,
+): { items: UpstreamItem[]; contentIncludedCount: number } {
+  if (mode !== "ground") {
+    return {
+      items: items.map((item) => ({ ...item, markdown: undefined })),
+      contentIncludedCount: 0,
+    };
+  }
+
+  const groundRequest = request as PrototypeGroundRequest;
+  let contentIncludedCount = 0;
+
+  const updatedItems = items.map((item, index) => {
+    if (index < groundRequest.maxContentResults) {
+      if (item.markdown) {
+        contentIncludedCount += 1;
+      }
+      return item;
+    }
+
+    return {
+      ...item,
+      markdown: undefined,
+    };
+  });
+
+  return {
+    items: updatedItems,
+    contentIncludedCount,
+  };
+}
+
+function applyWrapperPolicies(
+  items: UpstreamItem[],
+  request: PrototypeSearchRequest | PrototypeGroundRequest,
+  mode: PrototypeMode,
+): {
+  items: UpstreamItem[];
+  warnings: string[];
+  stats: UpstreamSearchResponse["stats"];
+} {
+  const domainResult = applyDomainFilters(items, request.includeDomains, request.excludeDomains);
+  const freshnessResult = applyFreshnessPolicy(domainResult.items, request.freshness);
+  const groundResult = applyGroundContentLimit(freshnessResult.items, request, mode);
+
+  const warnings = [...freshnessResult.warnings];
+  if (domainResult.filteredCount > 0) {
+    warnings.push(`Domain policy filtered ${domainResult.filteredCount} result(s).`);
+  }
+  if (freshnessResult.filteredCount > 0) {
+    warnings.push(`Freshness policy filtered ${freshnessResult.filteredCount} result(s).`);
+  }
+  if (
+    mode === "ground" &&
+    "maxContentResults" in request &&
+    request.maxContentResults < request.limit
+  ) {
+    warnings.push(`Ground mode limited enriched content to ${request.maxContentResults} result(s).`);
+  }
+
+  return {
+    items: groundResult.items,
+    warnings,
+    stats: {
+      upstreamCount: items.length,
+      domainFilteredCount: domainResult.filteredCount,
+      freshnessFilteredCount: freshnessResult.filteredCount,
+      contentIncludedCount: groundResult.contentIncludedCount,
+      parseableDateCount: freshnessResult.parseableDateCount,
+      errorCount: 0,
+      degradedReasons: freshnessResult.degradedReasons,
+    },
+  };
+}
+
 export class FirecrawlAdapter {
   constructor(private readonly options: AdapterOptions) {}
 
@@ -252,6 +438,15 @@ export class FirecrawlAdapter {
             message: "Missing FIRECRAWL_API_KEY for live mode.",
           },
         ],
+        stats: {
+          upstreamCount: 0,
+          domainFilteredCount: 0,
+          freshnessFilteredCount: 0,
+          contentIncludedCount: 0,
+          parseableDateCount: 0,
+          errorCount: 1,
+          degradedReasons: [],
+        },
       };
     }
 
@@ -260,10 +455,8 @@ export class FirecrawlAdapter {
     const timeoutId = setTimeout(() => controller.abort(), this.options.timeoutMs);
 
     try {
-      const domainOperators = buildSiteOperators(request.includeDomains, request.excludeDomains);
-      const query = domainOperators ? `${request.query} ${domainOperators}` : request.query;
       const body: Record<string, unknown> = {
-        query,
+        query: request.query,
         limit: request.limit,
         sources: request.sources,
       };
@@ -289,8 +482,10 @@ export class FirecrawlAdapter {
       const durationMs = Math.round(performance.now() - startedAt);
       const normalizedPayload = normalizePayload(rawPayload);
       const classifiedErrors = classifyErrors(normalizedPayload.payload, response.status);
+      const policyResult = applyWrapperPolicies(normalizedPayload.items, request, context.mode);
       const errors = [...normalizedPayload.errors, ...classifiedErrors];
-      const partial = inferPartialState(normalizedPayload.warnings, errors, normalizedPayload.items);
+      const warnings = [...normalizedPayload.warnings, ...policyResult.warnings];
+      const partial = inferPartialState(warnings, errors, policyResult.items);
 
       return {
         requestId: randomUUID(),
@@ -300,11 +495,15 @@ export class FirecrawlAdapter {
         usedFixture: null,
         statusCode: response.status,
         creditsUsed: normalizedPayload.payload.creditsUsed ?? 0,
-        warnings: normalizedPayload.warnings,
+        warnings,
         provider: "firecrawl",
         raw: rawPayload,
-        items: normalizedPayload.items,
+        items: policyResult.items,
         errors,
+        stats: {
+          ...policyResult.stats,
+          errorCount: errors.length,
+        },
       };
     } catch (error) {
       const durationMs = Math.round(performance.now() - startedAt);
@@ -327,6 +526,15 @@ export class FirecrawlAdapter {
             message: isAbort ? "The Firecrawl request timed out." : "The Firecrawl request failed.",
           },
         ],
+        stats: {
+          upstreamCount: 0,
+          domainFilteredCount: 0,
+          freshnessFilteredCount: 0,
+          contentIncludedCount: 0,
+          parseableDateCount: 0,
+          errorCount: 1,
+          degradedReasons: [],
+        },
       };
     } finally {
       clearTimeout(timeoutId);
@@ -342,8 +550,13 @@ export class FirecrawlAdapter {
     const payload = await readFixture(this.options.fixtureRoot, fixtureName);
     const durationMs = Math.round(performance.now() - startedAt);
     const normalizedPayload = normalizePayload(payload);
-    const items = normalizedPayload.items.slice(0, request.limit);
-    const partial = inferPartialState(normalizedPayload.warnings, normalizedPayload.errors, items);
+    const policyResult = applyWrapperPolicies(normalizedPayload.items, request, mode);
+    const items = policyResult.items.slice(0, request.limit);
+    const statusCode = payload._fixtureMeta?.statusCode ?? 200;
+    const classifiedErrors = classifyErrors(payload, statusCode);
+    const errors = [...normalizedPayload.errors, ...classifiedErrors];
+    const warnings = [...normalizedPayload.warnings, ...policyResult.warnings];
+    const partial = inferPartialState(warnings, errors, items);
 
     return {
       requestId: randomUUID(),
@@ -351,23 +564,17 @@ export class FirecrawlAdapter {
       environment: "fixture",
       durationMs,
       usedFixture: fixtureName,
-      statusCode: 200,
+      statusCode,
       creditsUsed: normalizedPayload.payload.creditsUsed ?? 0,
-      warnings: normalizedPayload.warnings,
+      warnings,
       provider: "fixture",
       raw: payload,
       items,
-      errors: partial
-        ? [
-            ...normalizedPayload.errors,
-            {
-              code: "PARTIAL_ENRICHMENT_FAILURE",
-              stage: "scrape",
-              message: "One result failed during enrichment in the fixture scenario.",
-              url: "https://example.com/failure",
-            },
-          ]
-        : normalizedPayload.errors,
+      errors,
+      stats: {
+        ...policyResult.stats,
+        errorCount: errors.length,
+      },
     };
   }
 }

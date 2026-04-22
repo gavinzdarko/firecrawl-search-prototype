@@ -14,6 +14,7 @@ The goal is not to replace Firecrawl internals. The goal is to show how much cle
 
 - A Fastify API wrapper with explicit `search` and `search/ground` modes
 - A comparison CLI for `raw` Firecrawl vs `improved` wrapper output
+- A side-by-side browser UI for raw vs improved comparison
 - Fixture-driven local development for deterministic demos
 - Live mode for exercising the real Firecrawl API
 - A stable response envelope with outcomes, diagnostics, and credits
@@ -26,6 +27,7 @@ Current implementation:
 - `POST /v1/search/ground`
 - `GET /v1/capabilities`
 - CLI for `raw` vs `improved` output comparison
+- Web comparison UI with scenario presets
 - fixture mode for deterministic local development
 - live Firecrawl mode when `FIRECRAWL_API_KEY` is configured
 
@@ -43,9 +45,11 @@ The current Firecrawl search surface is powerful, but it blends retrieval, enric
 npm install
 cp .env.example .env
 npm run dev
+npm run start:web
 ```
 
 The API starts on `http://localhost:3000`.
+The web UI starts on `http://localhost:4173`.
 
 In a separate terminal, compare raw and improved output:
 
@@ -54,6 +58,14 @@ npm run build
 npm run start:cli -- --mode improved "firecrawl funding"
 npm run start:cli -- --mode raw "firecrawl funding"
 ```
+
+Or use the browser UI presets to see:
+
+- basic success
+- trusted sources
+- partial enrichment failure
+- explicit upstream system issue
+- strict freshness filtering
 
 ## Environment
 
@@ -68,6 +80,7 @@ PROTOTYPE_REQUEST_TIMEOUT_MS=30000
 ```
 
 If `PROTOTYPE_USE_FIXTURES=true` or no Firecrawl API key is present, the server uses local fixtures.
+The wrapper enforces domain filters, freshness policy, and `maxContentResults` itself so those behaviors stay deterministic in fixture mode.
 
 ## NPM Scripts
 
@@ -101,7 +114,7 @@ curl -X POST http://localhost:3000/v1/search \
 
 ### `POST /v1/search/ground`
 
-Retrieval plus content enrichment.
+Retrieval plus content enrichment. The wrapper preserves enriched content only on the first `maxContentResults` normalized results.
 
 Example:
 
@@ -136,14 +149,21 @@ You can also target live Firecrawl calls by setting `PROTOTYPE_USE_FIXTURES=fals
 
 - `apps/api`: Fastify API wrapper
 - `apps/cli`: local comparison CLI
+- `apps/web`: browser UI for side-by-side raw vs improved comparison
 - `packages/core`: schemas, types, normalization, diagnostics, outcome mapping
 - `packages/firecrawl-adapter`: Firecrawl transport wrapper and fixture adapter
 - `fixtures/firecrawl`: fixture payloads used for local development and tests
 - `docs/api.md`: contract notes
 
-## CI And Contribution
+## Verification And Contribution
 
-GitHub Actions runs typecheck and build on pushes and pull requests. For contribution guidance, see [CONTRIBUTING.md](./CONTRIBUTING.md).
+The published repo is currently verified through the documented local commands:
+
+- `npm run typecheck`
+- `npm run build`
+- `npm test`
+
+For contribution guidance, see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Publishing Notes
 

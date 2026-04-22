@@ -5,6 +5,12 @@ This prototype intentionally makes two opinionated changes:
 1. Search and grounding are separate endpoints.
 2. Every response uses the same top-level envelope.
 
+## Important Prototype Semantics
+
+- `includeDomains` and `excludeDomains` are enforced by the wrapper on returned results.
+- `freshness` is a wrapper-side policy. It filters dated results when upstream dates are available and emits a warning when freshness cannot be verified.
+- `maxContentResults` is enforced by the wrapper in `/v1/search/ground`, so enrichment is preserved only on the first N normalized results.
+
 ## Common Envelope
 
 ```json

@@ -1,5 +1,13 @@
-import { normalizePrototypeResponse, PrototypeMode, PrototypeSearchRequest } from "@prototype/core";
+import {
+  normalizePrototypeResponse,
+  PrototypeMode,
+  prototypeSearchRequestSchema,
+  PrototypeSearchRequest,
+} from "@prototype/core";
 import { FirecrawlAdapter } from "@prototype/firecrawl-adapter";
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 type CliFlags = {
   mode: "improved" | "raw";
@@ -82,7 +90,7 @@ function parseArgs(argv: string[]): CliFlags {
 }
 
 function buildRequest(flags: CliFlags): PrototypeSearchRequest {
-  return {
+  return prototypeSearchRequestSchema.parse({
     query: flags.query,
     limit: flags.limit,
     sources: ["web"],
@@ -90,7 +98,22 @@ function buildRequest(flags: CliFlags): PrototypeSearchRequest {
     excludeDomains: flags.excludeDomains,
     freshness: "any",
     debug: flags.debug,
-  };
+  });
+}
+
+function resolveFixtureRoot(): URL {
+  let currentDir = path.dirname(fileURLToPath(import.meta.url));
+
+  for (let index = 0; index < 8; index += 1) {
+    const candidate = path.join(currentDir, "fixtures", "firecrawl", "search-success.json");
+    if (existsSync(candidate)) {
+      return new URL(`file://${path.join(currentDir, "fixtures", "firecrawl")}/`);
+    }
+
+    currentDir = path.dirname(currentDir);
+  }
+
+  throw new Error("Could not locate fixtures/firecrawl from the CLI entrypoint.");
 }
 
 async function main() {
@@ -101,7 +124,7 @@ async function main() {
     baseUrl: process.env.FIRECRAWL_BASE_URL ?? "https://api.firecrawl.dev",
     timeoutMs: Number(process.env.PROTOTYPE_REQUEST_TIMEOUT_MS ?? 30000),
     useFixtures: process.env.PROTOTYPE_USE_FIXTURES !== "false",
-    fixtureRoot: new URL("../../fixtures/firecrawl/", `file://${process.cwd()}/`),
+    fixtureRoot: resolveFixtureRoot(),
   });
 
   const upstream = await adapter.search(request, { mode: "search" as PrototypeMode });

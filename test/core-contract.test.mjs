@@ -22,6 +22,15 @@ function buildUpstreamResponse(overrides = {}) {
     raw: {},
     items: [],
     errors: [],
+    stats: {
+      upstreamCount: 0,
+      domainFilteredCount: 0,
+      freshnessFilteredCount: 0,
+      contentIncludedCount: 0,
+      parseableDateCount: 0,
+      errorCount: 0,
+      degradedReasons: [],
+    },
     ...overrides,
   };
 }
@@ -64,6 +73,39 @@ test("ground request rejects maxContentResults values above limit", () => {
   if (!parsed.success) {
     assert.match(parsed.error.issues[0]?.message ?? "", /cannot be greater than limit/i);
   }
+});
+
+test("normalization uses maxContentResults for content and estimated credits", () => {
+  const request = prototypeGroundRequestSchema.parse({
+    query: "firecrawl",
+    limit: 4,
+    maxContentResults: 2,
+    debug: true,
+  });
+
+  const normalized = normalizePrototypeResponse(
+    request,
+    buildUpstreamResponse({
+      items: [
+        { title: "One", url: "https://one.example.com", markdown: "# One", source: "web" },
+        { title: "Two", url: "https://two.example.com", markdown: "# Two", source: "web" },
+        { title: "Three", url: "https://three.example.com", markdown: "# Three", source: "web" },
+      ],
+      stats: {
+        upstreamCount: 3,
+        domainFilteredCount: 0,
+        freshnessFilteredCount: 0,
+        contentIncludedCount: 2,
+        parseableDateCount: 0,
+        errorCount: 0,
+        degradedReasons: [],
+      },
+    }),
+    "ground",
+  );
+
+  assert.equal(normalized.credits.estimated, 4);
+  assert.equal(normalized.diagnostics.contentIncludedCount, 2);
 });
 
 test("outcome mapping prefers configuration errors over empty no-match responses", () => {

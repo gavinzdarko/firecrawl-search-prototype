@@ -1,0 +1,11 @@
+{
+  "success": false,
+  "warning": "Search provider timed out",
+  "creditsUsed": 0,
+  "_fixtureMeta": {
+    "statusCode": 408
+  },
+  "data": {
+    "web": []
+  }
+}

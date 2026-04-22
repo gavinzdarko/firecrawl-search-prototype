@@ -45,12 +45,19 @@ type PrototypeResponse = {
     requestedLimit: number;
     returnedCount: number;
     filteredCount: number;
+    upstreamCount: number;
+    domainFilteredCount: number;
+    freshnessFilteredCount: number;
+    contentIncludedCount: number;
+    parseableDateCount: number;
+    errorCount: number;
     durationMs: number;
     sourceMode: Mode;
     provider: string;
     environment: "fixture" | "live";
     warnings: string[];
     usedFixture: string | null;
+    degradedReasons: string[];
     debug?: {
       rawUpstream?: RawFirecrawlResponse;
       includeDomains: string[];
@@ -147,6 +154,32 @@ const scenarios: Scenario[] = [
       mode: "ground",
       contentMode: "markdown",
       maxContentResults: 2,
+      sources: ["web"],
+    },
+  },
+  {
+    id: "system-issue",
+    label: "System issue",
+    description: "Shows explicit upstream failure instead of empty-success ambiguity.",
+    apply: {
+      query: "system issue firecrawl",
+      mode: "search",
+      freshness: "any",
+      includeDomains: "",
+      excludeDomains: "",
+      sources: ["web"],
+    },
+  },
+  {
+    id: "freshness",
+    label: "Freshness policy",
+    description: "Applies wrapper-side freshness filtering using dated fixture results.",
+    apply: {
+      query: "firecrawl funding",
+      mode: "search",
+      freshness: "strict",
+      includeDomains: "",
+      excludeDomains: "",
       sources: ["web"],
     },
   },
@@ -335,11 +368,20 @@ function renderDiagnostics(response: PrototypeResponse): string {
       <div class="stat-grid">
         ${statCard("normalized query", response.diagnostics.normalizedQuery)}
         ${statCard("provider", response.diagnostics.provider)}
+        ${statCard("upstream count", String(response.diagnostics.upstreamCount))}
         ${statCard("returned count", String(response.diagnostics.returnedCount))}
         ${statCard("filtered count", String(response.diagnostics.filteredCount))}
+        ${statCard("domain filtered", String(response.diagnostics.domainFilteredCount))}
+        ${statCard("freshness filtered", String(response.diagnostics.freshnessFilteredCount))}
+        ${statCard("content included", String(response.diagnostics.contentIncludedCount))}
         ${statCard("duration", `${response.diagnostics.durationMs} ms`)}
         ${statCard("credits", `${response.credits.used} used / ${response.credits.estimated} estimated`)}
       </div>
+      ${
+        response.diagnostics.degradedReasons.length > 0
+          ? `<p class="footer-note">Degraded reasons: <strong>${response.diagnostics.degradedReasons.join(", ")}</strong></p>`
+          : ""
+      }
       ${
         debug
           ? `
@@ -620,8 +662,9 @@ function render(): void {
           }
 
           <p class="footer-note">
-            Fixture triggers: queries containing <code>partial</code> or <code>no results</code>
-            map to deterministic local scenarios through the existing adapter.
+            Fixture triggers: queries containing <code>partial</code>, <code>no results</code>,
+            <code>system issue</code>, or <code>timeout</code> map to deterministic local scenarios
+            through the adapter.
           </p>
         </aside>
 

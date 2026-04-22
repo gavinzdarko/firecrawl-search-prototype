@@ -114,6 +114,15 @@ export type UpstreamSearchResponse = {
   raw?: unknown;
   items: UpstreamItem[];
   errors: UpstreamError[];
+  stats: {
+    upstreamCount: number;
+    domainFilteredCount: number;
+    freshnessFilteredCount: number;
+    contentIncludedCount: number;
+    parseableDateCount: number;
+    errorCount: number;
+    degradedReasons: string[];
+  };
 };
 
 export type PrototypeResponse = {
@@ -145,12 +154,19 @@ export type PrototypeResponse = {
     requestedLimit: number;
     returnedCount: number;
     filteredCount: number;
+    upstreamCount: number;
+    domainFilteredCount: number;
+    freshnessFilteredCount: number;
+    contentIncludedCount: number;
+    parseableDateCount: number;
+    errorCount: number;
     durationMs: number;
     sourceMode: PrototypeMode;
     provider: string;
     environment: "fixture" | "live";
     warnings: string[];
     usedFixture: string | null;
+    degradedReasons: string[];
     debug?: {
       rawUpstream?: unknown;
       includeDomains: string[];
@@ -178,9 +194,22 @@ function getDomain(url: string): string | null {
   }
 }
 
-function estimateCredits(limit: number, mode: PrototypeMode): number {
+function estimateCredits(
+  request: PrototypeSearchRequest | PrototypeGroundRequest,
+  mode: PrototypeMode,
+  resultCount: number,
+): number {
+  const limit = request.limit;
   const searchCredits = Math.ceil(limit / 10) * 2;
-  return mode === "ground" ? searchCredits + limit : searchCredits;
+  if (mode !== "ground") {
+    return searchCredits;
+  }
+
+  const contentCount =
+    "maxContentResults" in request
+      ? Math.min(request.maxContentResults, request.limit, resultCount)
+      : Math.min(limit, resultCount);
+  return searchCredits + contentCount;
 }
 
 function hasErrorCode(response: UpstreamSearchResponse, code: string): boolean {
@@ -192,11 +221,8 @@ function isPartialResponse(response: UpstreamSearchResponse): boolean {
 }
 
 function scoreFromPosition(position?: number): number | null {
-  if (!position || position < 1) {
-    return null;
-  }
-
-  return Number(Math.max(0.05, 1 - (position - 1) * 0.1).toFixed(2));
+  void position;
+  return null;
 }
 
 export function determineOutcome(response: UpstreamSearchResponse): PrototypeResponse["outcome"] {
@@ -278,7 +304,10 @@ export function normalizePrototypeResponse(
       snippet: item.description?.trim() || item.snippet?.trim() || null,
       source: item.source,
       position: item.position ?? null,
-      score: scoreFromPosition(item.position),
+      score:
+        typeof item.metadata?.score === "number" && Number.isFinite(item.metadata.score)
+          ? item.metadata.score
+          : scoreFromPosition(item.position),
       content: mode === "ground" ? item.markdown?.trim() || null : null,
       imageUrl: item.imageUrl ?? null,
       publishedAt: item.date ?? null,
@@ -292,13 +321,20 @@ export function normalizePrototypeResponse(
       normalizedQuery,
       requestedLimit: request.limit,
       returnedCount: response.items.length,
-      filteredCount: Math.max(0, request.limit - response.items.length),
+      filteredCount: response.stats.domainFilteredCount + response.stats.freshnessFilteredCount,
+      upstreamCount: response.stats.upstreamCount,
+      domainFilteredCount: response.stats.domainFilteredCount,
+      freshnessFilteredCount: response.stats.freshnessFilteredCount,
+      contentIncludedCount: response.stats.contentIncludedCount,
+      parseableDateCount: response.stats.parseableDateCount,
+      errorCount: response.stats.errorCount,
       durationMs: response.durationMs,
       sourceMode: mode,
       provider: response.provider,
       environment: response.environment,
       warnings: response.warnings,
       usedFixture: response.usedFixture,
+      degradedReasons: response.stats.degradedReasons,
       debug: request.debug
         ? {
             rawUpstream: response.raw,
@@ -309,7 +345,7 @@ export function normalizePrototypeResponse(
         : undefined,
     },
     credits: {
-      estimated: estimateCredits(request.limit, mode),
+      estimated: estimateCredits(request, mode, response.items.length),
       used: response.creditsUsed,
       currency: "credits",
     },
