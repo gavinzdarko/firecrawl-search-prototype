@@ -41,25 +41,39 @@ The current Firecrawl search surface is powerful, but it blends retrieval, enric
 
 ## Quick Start
 
+Install dependencies once:
+
 ```bash
 npm install
 cp .env.example .env
+```
+
+Run locally in two terminals:
+
+Terminal 1:
+
+```bash
 npm run dev
+```
+
+Terminal 2:
+
+```bash
 npm run start:web
 ```
 
-The API starts on `http://localhost:3000`.
-The web UI starts on `http://localhost:4173`.
+The API runs on `http://localhost:3000`.
+The web UI runs on `http://localhost:4173`.
 
 ## Replit
 
-This repo is configured for Replit.
+This repo includes a Replit-ready `.replit` config.
 
 1. Import the GitHub repo into Replit.
 2. Click `Run`.
 3. Open the web app on port `4173`.
 
-Replit runs both the API and the browser UI together through `npm run repl`.
+Replit uses `npm run repl` to start both the API and the browser UI together.
 
 In a separate terminal, compare raw and improved output:
 
